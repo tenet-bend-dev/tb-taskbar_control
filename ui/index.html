@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Taskbar Control Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --brand-black: #050505;
+      --brand-dark: #0a0a0a;
+      --brand-gray: #121212;
+      --brand-border: #1a1a1a;
+      --accent: #00ff88;
+      --accent-dim: #006644;
+      --accent-blue: #58a6ff;
+      --text: #f3f4f6;
+      --subtext: #8a8e9b;
+      --subtext-dim: #5a5e6b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, sans-serif; }
+
+    body {
+      background-color: var(--brand-black);
+      background-image:
+        linear-gradient(to right, #141414 1px, transparent 1px),
+        linear-gradient(to bottom, #141414 1px, transparent 1px);
+      background-size: 3rem 3rem;
+      color: var(--text);
+      padding: 24px;
+      user-select: none;
+      position: relative;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .ambient-glow {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      filter: blur(90px);
+    }
+
+    .ambient-glow--green {
+      top: -80px;
+      left: -60px;
+      width: 380px;
+      height: 380px;
+      background: rgba(0, 255, 136, 0.06);
+    }
+
+    .ambient-glow--blue {
+      bottom: -100px;
+      right: -60px;
+      width: 380px;
+      height: 380px;
+      background: rgba(88, 166, 255, 0.05);
+    }
+
+    body > *:not(.ambient-glow) { position: relative; z-index: 1; }
+
+    ::selection { background: var(--accent); color: var(--brand-black); }
+
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--brand-black); }
+    ::-webkit-scrollbar-thumb { background: var(--brand-border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+    header {
+      margin-bottom: 28px;
+      opacity: 0;
+      animation: fadeInUp 0.5s ease-out forwards;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: rgba(0, 255, 136, 0.1);
+      border: 1px solid rgba(0, 255, 136, 0.3);
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    /* True "ping": expanding, fading ring behind a solid dot core */
+    .status-pill .dot-wrap {
+      position: relative;
+      display: inline-flex;
+      width: 6px;
+      height: 6px;
+    }
+
+    .status-pill .dot-ping {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+
+    .status-pill .dot-core {
+      position: relative;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px rgba(0, 255, 136, 0.8);
+    }
+
+    @keyframes ping {
+      0% { transform: scale(1); opacity: 0.8; }
+      75%, 100% { transform: scale(2.8); opacity: 0; }
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.02em;
+    }
+
+    p.subtitle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--subtext);
+      margin-top: 6px;
+      letter-spacing: 0.4px;
+    }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    .card {
+      background: var(--brand-dark);
+      border-radius: 10px;
+      padding: 18px;
+      border: 1px solid var(--brand-border);
+      position: relative;
+      transition: all 0.3s ease;
+      opacity: 0;
+      animation: fadeInUp 0.5s ease-out forwards;
+      animation-delay: var(--card-delay, 0.1s);
+    }
+
+    .grid .card:nth-child(1) { --card-delay: 0.1s; }
+    .grid .card:nth-child(2) { --card-delay: 0.2s; }
+    .card--wide { --card-delay: 0.3s; }
+
+    .card:hover {
+      border-color: rgba(0, 255, 136, 0.35);
+      box-shadow: 0 0 25px rgba(0, 255, 136, 0.08);
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--brand-border);
+      transition: border-color 0.3s ease;
+    }
+
+    .card:hover .card-header {
+      border-color: rgba(0, 255, 136, 0.2);
+    }
+
+    .card h2 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      color: var(--accent);
+      font-weight: 700;
+      text-shadow: 0 0 10px rgba(0, 255, 136, 0.25);
+    }
+
+    .card-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .icon-box {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      background: var(--brand-black);
+      border: 1px solid var(--brand-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-size: 0.8rem;
+      flex-shrink: 0;
+      transition: all 0.3s ease;
+    }
+
+    .card:hover .icon-box {
+      border-color: var(--accent);
+      box-shadow: 0 0 12px rgba(0, 255, 136, 0.2);
+    }
+
+    .status-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(0, 255, 136, 0.08);
+      border: 1px solid rgba(0, 255, 136, 0.2);
+      color: var(--accent);
+    }
+
+    .card-desc {
+      font-size: 0.75rem;
+      color: var(--subtext);
+      margin-bottom: 18px;
+      line-height: 1.45;
+      font-weight: 300;
+    }
+
+    .control-group { margin-bottom: 14px; }
+    .control-group:last-child { margin-bottom: 0; }
+
+    label {
+      display: block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      margin-bottom: 7px;
+      color: #ccc;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    select, input[type="color"] {
+      width: 100%;
+      background: #000;
+      border: 1px solid var(--brand-border);
+      color: #fff;
+      padding: 9px 10px;
+      border-radius: 6px;
+      outline: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      transition: all 0.3s ease;
+    }
+
+    select:hover, input[type="color"]:hover {
+      border-color: rgba(0, 255, 136, 0.4);
+    }
+
+    select:focus, input[type="color"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.12), 0 0 15px rgba(0, 255, 136, 0.15);
+    }
+
+    select:active, input[type="color"]:active {
+      border-color: var(--accent);
+      transform: scale(0.99);
+    }
+
+    select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2300ff88' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 30px;
+    }
+
+    input[type="color"] { height: 40px; cursor: pointer; padding: 3px; }
+
+    select option {
+      background: #000;
+      color: #fff;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      padding: 8px;
+    }
+
+    select option:checked,
+    select option:hover {
+      background: var(--accent);
+      color: var(--brand-black);
+    }
+
+    .slider-container { display: flex; align-items: center; gap: 12px; }
+
+    input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--brand-border);
+      outline: none;
+    }
+
+    input[type="range"] { transition: all 0.3s ease; }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+      cursor: pointer;
+      border: 2px solid #000;
+      transition: all 0.3s ease;
+    }
+
+    input[type="range"]:hover::-webkit-slider-thumb {
+      box-shadow: 0 0 16px rgba(0, 255, 136, 0.9);
+      transform: scale(1.15);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+      cursor: pointer;
+      border: 2px solid #000;
+      transition: all 0.3s ease;
+    }
+
+    input[type="range"]:hover::-moz-range-thumb {
+      box-shadow: 0 0 16px rgba(0, 255, 136, 0.9);
+      transform: scale(1.15);
+    }
+
+    .val-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--accent);
+      width: 38px;
+      text-align: right;
+    }
+
+    /* Switch Component */
+    .switch { position: relative; display: inline-block; width: 38px; height: 21px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: var(--brand-gray);
+      border: 1px solid var(--brand-border);
+      transition: all 0.3s ease;
+      border-radius: 20px;
+    }
+    .slider:before {
+      position: absolute; content: ""; height: 13px; width: 13px; left: 3px; bottom: 3px;
+      background-color: #888; transition: all 0.3s ease; border-radius: 50%;
+    }
+    .switch:hover .slider {
+      border-color: rgba(0, 255, 136, 0.4);
+    }
+    .switch:active .slider {
+      transform: scale(0.96);
+    }
+    input:checked + .slider {
+      background-color: rgba(0, 255, 136, 0.12);
+      border-color: var(--accent);
+    }
+    input:checked + .slider:before {
+      transform: translateX(17px);
+      background-color: var(--accent);
+      box-shadow: 0 0 8px rgba(0, 255, 136, 0.8);
+      animation: glowBreathe 2s ease-in-out infinite;
+    }
+
+    @keyframes glowBreathe {
+      0%, 100% { box-shadow: 0 0 8px rgba(0, 255, 136, 0.8); }
+      50% { box-shadow: 0 0 14px rgba(0, 255, 136, 0.5); }
+    }
+
+    .card--wide { grid-column: span 2; margin-top: 16px; }
+
+    .diag-console {
+      background: #000;
+      border: 1px solid var(--brand-border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      margin-top: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--accent);
+      height: 110px;
+      overflow-y: auto;
+      line-height: 1.7;
+    }
+
+    .diag-console .ts { color: #4a4e5b; }
+    .diag-console .tag-log { color: var(--accent-blue); }
+    .diag-console .tag-ok { color: var(--accent); font-weight: 700; }
+    .diag-console div { opacity: 0; animation: fadeIn 0.3s ease-out forwards; }
+
+    .diag-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 18px;
+    }
+
+    .diag-label h4 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.66rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--subtext);
+      font-weight: 700;
+    }
+
+    .diag-label .clear-btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--subtext-dim);
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: color 0.2s ease;
+    }
+
+    .diag-label .clear-btn:hover { color: var(--accent); }
+
+    .diag-label .clear-btn:active {
+      transform: scale(0.92);
+      color: var(--accent);
+    }
+
+    footer.status-bar {
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.62rem;
+      color: var(--subtext-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding-top: 14px;
+      border-top: 1px solid var(--brand-border);
+      opacity: 0;
+      animation: fadeIn 0.5s ease-out forwards;
+      animation-delay: 0.4s;
+    }
+
+    footer.status-bar .accent-text { color: var(--accent-blue); }
+
+    footer.status-bar .sig-tag { color: var(--accent); font-weight: 700; }
+
+    footer.status-bar .live-dot {
+      display: inline-block;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--accent-blue);
+      margin-right: 5px;
+      animation: pulseOpacity 1.6s ease-in-out infinite;
+    }
+
+    @keyframes pulseOpacity {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ambient-glow ambient-glow--green"></div>
+  <div class="ambient-glow ambient-glow--blue"></div>
+
+  <header>
+    <div class="status-pill">
+      <span class="dot-wrap">
+        <span class="dot-ping"></span>
+        <span class="dot-core"></span>
+      </span>
+      <span>Runtime Online</span>
+    </div>
+    <h1>Taskbar Customizer</h1>
+    <p class="subtitle">// Lightweight Win32 Taskbar State Manager</p>
+  </header>
+
+  <div class="grid">
+    <!-- Desktop / Default State -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="icon-box"><i class="fas fa-desktop"></i></div>
+          <h2>1. Regular State</h2>
+        </div>
+        <span class="status-tag">Auto-Detect</span>
+      </div>
+      <p class="card-desc">Active state when sitting on your desktop with no windows open/maximized.</p>
+
+      <div class="control-group">
+        <label for="desktop-mode">Visual Style</label>
+        <select id="desktop-mode" onchange="sendUpdate('desktop')">
+          <option value="clear" selected>Clear (100% Transparent)</option>
+          <option value="acrylic">Acrylic (Frosted Glass)</option>
+          <option value="blur">Blur</option>
+          <option value="opaque">Opaque (Solid Color)</option>
+          <option value="normal">Default Windows</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="desktop-color">Tint Color</label>
+        <input type="color" id="desktop-color" value="#000000" onchange="sendUpdate('desktop')">
+      </div>
+
+      <div class="control-group">
+        <label>Tint Opacity</label>
+        <div class="slider-container">
+          <input type="range" id="desktop-opacity" min="0" max="100" value="0" oninput="updateBadge('desktop-opacity-val', this.value); sendUpdate('desktop')">
+          <span id="desktop-opacity-val" class="val-badge">0%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Maximized Window Override -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="icon-box"><i class="fas fa-expand"></i></div>
+          <h2>2. Maximized State</h2>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="max-toggle" onchange="sendUpdate('maximized')">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <p class="card-desc">Automatically switches taskbar appearance when a window is maximized.</p>
+
+      <div class="control-group">
+        <label for="max-mode">Visual Style</label>
+        <select id="max-mode" onchange="sendUpdate('maximized')">
+          <option value="opaque" selected>Opaque (Solid Dark)</option>
+          <option value="acrylic">Acrylic</option>
+          <option value="blur">Blur</option>
+          <option value="clear">Clear</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="max-color">Tint Color</label>
+        <input type="color" id="max-color" value="#10121a" onchange="sendUpdate('maximized')">
+      </div>
+
+      <div class="control-group">
+        <label>Tint Opacity</label>
+        <div class="slider-container">
+          <input type="range" id="max-opacity" min="0" max="100" value="100" oninput="updateBadge('max-opacity-val', this.value); sendUpdate('maximized')">
+          <span id="max-opacity-val" class="val-badge">100%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Windows Startup Switch -->
+  <div class="card card--wide">
+    <div class="card-header">
+      <div class="card-title-group">
+        <div class="icon-box"><i class="fas fa-power-off"></i></div>
+        <h2>3. System Settings</h2>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="startup-toggle" onchange="toggleStartup(this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="card-desc">Automatically launch Taskbar Control Panel when logging into Windows.</p>
+
+    <div class="diag-label">
+      <h4>Live Diagnostics</h4>
+      <button class="clear-btn" onclick="clearDiagLog()">Clear</button>
+    </div>
+    <div id="diag-console" class="diag-console">
+      <div><span class="ts">[--:--:--]</span> <span class="tag-log">[LOG]</span> Runtime initialized. Standing by for config changes.</div>
+    </div>
+  </div>
+
+  <footer class="status-bar">
+    <span><span class="live-dot"></span>Config Sync: <span class="accent-text">Local IPC Channel</span></span>
+    <span>Signature: <span class="sig-tag">LOCAL//VERIFIED</span></span>
+  </footer>
+
+  <script>
+    function updateBadge(id, val) {
+      document.getElementById(id).innerText = val + '%';
+    }
+
+    // Opaque/Default ignore the opacity slider, so lock it to avoid confusion
+    function syncOpacityLock(prefix) {
+      const mode = document.getElementById(`${prefix}-mode`).value;
+      const locked = (mode === 'opaque' || mode === 'normal');
+      const slider = document.getElementById(`${prefix}-opacity`);
+      slider.disabled = locked;
+      slider.style.opacity = locked ? '0.35' : '1';
+    }
+
+    // Config is injected by Rust before the page loads, so hydrate as soon as the DOM is ready
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.__INITIAL_CONFIG__ && window.hydrateConfig) {
+        window.hydrateConfig(window.__INITIAL_CONFIG__);
+      }
+      syncOpacityLock('desktop');
+      syncOpacityLock('max');
+    });
+
+    function timestamp() {
+      const d = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function appendDiagLog(tagClass, tagText, message) {
+      const consoleBox = document.getElementById('diag-console');
+      const entry = document.createElement('div');
+      entry.innerHTML = `<span class="ts">[${timestamp()}]</span> <span class="${tagClass}">[${tagText}]</span> ${message}`;
+      consoleBox.appendChild(entry);
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+
+    function clearDiagLog() {
+      document.getElementById('diag-console').innerHTML =
+        `<div><span class="ts">[${timestamp()}]</span> <span class="tag-log">[LOG]</span> Console cleared. Standing by.</div>`;
+    }
+
+    // Hydrate controls from saved Rust AppConfig on startup
+    // Hydrate controls from saved Rust AppConfig on startup
+    window.hydrateConfig = function(cfg) {
+      if (!cfg) return;
+
+      if (cfg.desktop) {
+        document.getElementById('desktop-mode').value = cfg.desktop.state || 'clear';
+        document.getElementById('desktop-color').value = cfg.desktop.hex_color || '#000000';
+        document.getElementById('desktop-opacity').value = cfg.desktop.opacity ?? 0;
+        updateBadge('desktop-opacity-val', cfg.desktop.opacity ?? 0);
+      }
+ 
+      if (cfg.maximized) {
+        document.getElementById('max-toggle').checked = cfg.maximized_enabled ?? false;
+        document.getElementById('max-mode').value = cfg.maximized.state || 'opaque';
+        document.getElementById('max-color').value = cfg.maximized.hex_color || '#10121a';
+        document.getElementById('max-opacity').value = cfg.maximized.opacity ?? 100;
+        updateBadge('max-opacity-val', cfg.maximized.opacity ?? 100);
+      }
+
+      // Explicitly sync the startup toggle with the registry state
+      const startupToggle = document.getElementById('startup-toggle');
+      if (startupToggle && typeof cfg.startup_enabled !== 'undefined') {
+        startupToggle.checked = Boolean(cfg.startup_enabled);
+      }
+
+      syncOpacityLock('desktop');
+      syncOpacityLock('max');
+      appendDiagLog('tag-ok', 'SUCCESS', 'Saved configuration hydrated into UI.');
+    };
+
+    // Toggle Windows Startup
+    function toggleStartup(isEnabled) {
+      if (window.ipc) {
+        window.ipc.postMessage(JSON.stringify({
+          type: "SET_STARTUP",
+          enabled: isEnabled
+        }));
+      }
+      appendDiagLog('tag-ok', 'SUCCESS', `Startup on login set to <span style="color:#fff">${isEnabled ? 'ENABLED' : 'DISABLED'}</span>.`);
+    }
+
+    function sendUpdate(target) {
+      const isMax = target === 'maximized';
+      const prefix = isMax ? 'max' : 'desktop';
+      syncOpacityLock(prefix);
+
+      const state = document.getElementById(`${prefix}-mode`).value;
+      const hexColor = document.getElementById(`${prefix}-color`).value;
+      const opacityPercent = parseInt(document.getElementById(`${prefix}-opacity`).value);
+      const enabled = isMax ? document.getElementById('max-toggle').checked : true;
+
+      if (window.ipc) {
+        window.ipc.postMessage(JSON.stringify({
+          type: 'UPDATE_CONFIG',
+          target: target,
+          enabled: enabled,
+          state: state,
+          hex_color: hexColor,
+          opacity: opacityPercent
+        }));
+      }
+
+      appendDiagLog('tag-log', 'LOG', `${isMax ? 'Maximized' : 'Regular'} state → style: <span style="color:#fff">${state}</span>, tint: <span style="color:#fff">${hexColor}</span>, opacity: <span style="color:#fff">${opacityPercent}%</span>`);
+    }
+  </script>
+</body>
+</html>

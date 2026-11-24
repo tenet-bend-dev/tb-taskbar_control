@@ -1,0 +1,139 @@
+==============================================================
+ TENET BEND - Taskbar Control Utility  (taskbar_control)
+==============================================================
+
+A Windows taskbar customization utility written in Rust using
+wry/tao (WebView2) and Win32 APIs[cite: 10]. It runs from the
+system tray with a custom HTML control panel and tray menu,
+customizing taskbar appearance across desktop and maximized-window
+states while persisting settings and optional startup launch[cite: 9, 10].
+
+Subsystem : Windows GUI (`#![windows_subsystem = "windows"]`)[cite: 10]
+Target    : Windows (uses `windows-sys` and `SetWindowCompositionAttribute`)[cite: 10]
+
+
+--------------------------------------------------------------
+1. PROJECT LAYOUT
+--------------------------------------------------------------
+
+  Cargo.toml         Package manifest and dependencies
+  build.rs           Compiles icon/manifest resources (IDI_ICON1)[cite: 10]
+  assets\icon.ico    Application and tray icon[cite: 10]
+  ui\index.html      Control panel UI hydrated via IPC[cite: 10]
+  src\main.rs        Event engine, tray/popup windows, and IPC[cite: 10]
+  src\features.rs    Config persistence and Windows Run registry[cite: 9, 10]
+
+Dependencies: serde, serde_json, image, wry, windows-sys[cite: 9, 10].
+
+
+--------------------------------------------------------------
+2. BUILD
+--------------------------------------------------------------
+
+  cargo build --release
+
+The release executable is created at:
+
+  target\release\taskbar_control.exe
+
+
+--------------------------------------------------------------
+3. USAGE & CONTROLS
+--------------------------------------------------------------
+
+Launching `taskbar_control.exe` starts the background taskbar
+engine, creates a single-instance mutex, and places an icon in
+the Windows system tray (starts with the main panel hidden)[cite: 10].
+
+System tray & popup menu:
+  Click tray icon   Toggle the custom frameless tray menu near
+                    the cursor[cite: 10]
+  Show / Hide       Toggle the main control panel window[cite: 10]
+  Exit Panel        Reset taskbar accent state and exit[cite: 10]
+
+Main control panel (`Taskbar Control Panel`):
+  Desktop state     Configure style (`clear`, `opaque`, `acrylic`,
+                    `blur`, or `normal`/`default`), hex color,
+                    and opacity (0-100%)[cite: 10]
+  Maximized state   Optional separate style, hex color, and
+                    opacity when a non-minimized window is
+                    maximized[cite: 10]
+  Startup toggle    Add or remove the app from the current user's
+                    Windows startup Run key[cite: 9, 10]
+
+
+--------------------------------------------------------------
+4. WHAT IT DOES
+--------------------------------------------------------------
+
+1. Enforces a single instance via `Local\TENET_TaskbarControl_Singleton`
+     mutex so a second copy exits cleanly instead of fighting
+     over the taskbar[cite: 10].
+2. Loads saved settings from `%APPDATA%\TENET_TaskbarControl\taskbar_config.json`
+     (falling back to the exe folder if `APPDATA` is unset) and
+     syncs `startup_enabled` with `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`[cite: 9, 10].
+3. Applies taskbar styling to both `Shell_TrayWnd` (primary
+     taskbar) and `Shell_SecondaryTrayWnd` (secondary taskbars)
+     via `SetWindowCompositionAttribute`[cite: 10].
+4. Switches between desktop and maximized configurations when
+     `maximized_enabled` is active and a visible, non-cloaked,
+     non-tool window is maximized[cite: 10].
+5. Runs an event-driven watcher (`SetWinEventHook` for
+     foreground changes, minimize/restore, virtual desktop
+     switch, location changes, and cloak/uncloak) with short
+     re-apply bursts and a 1000 ms heartbeat timer[cite: 10].
+6. Saves config changes atomically by writing `taskbar_config.json.tmp`
+     first and renaming over `taskbar_config.json`[cite: 9, 10].
+
+
+--------------------------------------------------------------
+5. CONFIG & REGISTRY
+--------------------------------------------------------------
+
+Settings file:
+
+  %APPDATA%\TENET_TaskbarControl\taskbar_config.json
+
+Temporary file used during atomic save:
+
+  %APPDATA%\TENET_TaskbarControl\taskbar_config.json.tmp[cite: 9]
+
+Windows startup registry entry:
+
+  HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+  Value name : TENET_TaskbarControl[cite: 9]
+
+
+--------------------------------------------------------------
+6. SAFETY & BEHAVIOR NOTES
+--------------------------------------------------------------
+
+- Closing the main panel window hides it instead of exiting
+  the application; use **Exit Panel** in the tray menu to quit[cite: 10].
+- Selecting **Exit Panel** resets taskbar composition back to
+  disabled (`ACCENT_DISABLED`) before exiting[cite: 10].
+- `SetWindowCompositionAttribute` relies on an undocumented
+  Win32 composition attribute (`19`), so behavior can vary
+  across Windows builds or updates[cite: 10].
+- For `opaque` mode, alpha is fixed to `255` (solid); use
+  `acrylic`, `blur`, or `clear` for transparency/tint[cite: 10].
+- If `APPDATA` is unavailable, `taskbar_config.json` falls back
+  to the directory containing the executable[cite: 9].
+
+
+--------------------------------------------------------------
+7. KNOWN BEHAVIOR (NOT BUGS)
+--------------------------------------------------------------
+
+- Re-applying taskbar styles during background events uses a
+  quiet update without forcing a full frame redraw to avoid
+  flicker[cite: 10].
+- Short re-apply bursts (`60 ms`, `200 ms`, `600 ms`) plus a
+  `1000 ms` heartbeat counter moments when Windows Explorer
+  resets taskbar styling after shell or display events[cite: 10].
+- Cloaked windows (such as on other virtual desktops) and
+  tool windows are ignored when checking maximized state[cite: 10].
+- Tray menu focus-loss hiding has a `250 ms` grace period
+  right after opening to avoid immediate dismissal[cite: 10].
+
+==============================================================
